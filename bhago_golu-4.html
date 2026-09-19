@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Bhago Golu! 😂</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,sans-serif;background:#111}
+#game{position:relative;width:100%;height:100%;max-width:520px;margin:auto;background:linear-gradient(#79d7ff 0 48%,#7bc96f 48% 100%);overflow:hidden}
+#road{position:absolute;left:18%;width:64%;top:0;height:100%;background:#555;transform:perspective(500px) rotateX(0deg)}
+.lane{position:absolute;top:0;height:100%;width:3px;background:repeating-linear-gradient(to bottom,#eee 0 55px,transparent 55px 110px);opacity:.7}
+.l1{left:33%}.l2{left:66%}
+#hud{position:absolute;z-index:10;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;color:#fff;font-weight:800;text-shadow:2px 2px #222;font-size:18px}
+#player{position:absolute;z-index:6;bottom:11%;left:50%;font-size:60px;transform:translateX(-50%);transition:left .12s}
+.ob,.coin,.power{position:absolute;z-index:5;transform:translateX(-50%);font-size:42px}
+.coin{font-size:34px}.power{font-size:38px}
+#cow{position:absolute;z-index:4;bottom:1%;left:50%;font-size:58px;transform:translateX(-50%);opacity:.95}
+#msg{position:absolute;z-index:20;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:25px;background:#0008;color:#fff}
+.card{background:#ffffffee;color:#222;border-radius:22px;padding:25px;max-width:330px;box-shadow:0 10px 35px #0008}
+button{border:0;border-radius:14px;padding:13px 24px;font-size:18px;font-weight:800;background:#ffb000;color:#222}
+small{display:block;margin-top:10px}
+#toast{position:absolute;z-index:15;top:65px;left:50%;transform:translateX(-50%);color:#fff;font-size:20px;font-weight:900;text-shadow:2px 2px #222;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="road"></div><div class="lane l1"></div><div class="lane l2"></div>
+  <div id="hud"><span>🏆 <b id="score">0</b></span><span>🪙 <b id="coins">0</b></span></div>
+  <div id="toast"></div>
+  <div id="player">🏃</div><div id="cow">🐄</div>
+  <div id="msg"><div class="card" id="homeCard">
+    <div style="font-size:64px">🐄🏃</div>
+    <h1>भागो गोलू! 😂</h1>
+    <p>गाय पीछे पड़ गई!</p>
+    <button id="start">▶️ PLAY GAME</button>
+    <button id="how" style="margin-top:10px;background:#ddd">❓ HOW TO PLAY</button>
+    <p id="howText" style="display:none;font-size:14px">Swipe ← → से lane बदलो और ↑ swipe करके jump करो। Coins 🪙 लो और obstacles से बचो!</p>
+    <small>🏆 High Score: <b id="homeHigh">0</b></small>
+  </div></div>
+</div>
+<script>
+const game=document.getElementById('game'),player=document.getElementById('player'),cow=document.getElementById('cow');
+const scoreEl=document.getElementById('score'),coinsEl=document.getElementById('coins'),msg=document.getElementById('msg'),toast=document.getElementById('toast');
+let lane=1, score=0, coins=0, running=false, jumping=false, speed=4, last=0, spawn=0, items=[];
+const centers=()=>[25,50,75];
+let high=+localStorage.goluHigh||0; document.getElementById('homeHigh').textContent=high;
+
+function say(t){toast.textContent=t;clearTimeout(say.t);say.t=setTimeout(()=>toast.textContent='',1200)}
+function setLane(n){lane=Math.max(0,Math.min(2,n));player.style.left=centers()[lane]+'%'}
+function jump(){
+ if(!running||jumping)return; jumping=true; player.style.bottom='22%';
+ setTimeout(()=>{player.style.bottom='11%';jumping=false},430);
+}
+function spawnItem(){
+ const el=document.createElement('div'), type=Math.random()<.55?'coin':Math.random()<.8?'ob':'power';
+ el.className=type;
+ const l=Math.floor(Math.random()*3); el.dataset.l=l; el.style.left=centers()[l]+'%'; el.style.top='-55px';
+ el.textContent=type==='coin'?'🪙':type==='ob'?(Math.random()<.5?'🛵':'📦'):'🛡️';
+ game.appendChild(el); items.push({el,y:-55,type,l});
+}
+function overlap(a,b){
+ const A=a.getBoundingClientRect(),B=b.getBoundingClientRect();
+ return A.left<B.right&&A.right>B.left&&A.top<B.bottom&&A.bottom>B.top;
+}
+function gameOver(){
+ running=false;
+ if(Math.floor(score)>high){high=Math.floor(score);localStorage.goluHigh=high}
+ msg.innerHTML=`<div class="card"><h1>😂 पकड़े गए!</h1><p>Score: <b>${score}</b><br>Coins: <b>${coins}</b><br>High Score: <b>${high}</b></p><button onclick="startGame()">PLAY AGAIN</button></div>`;
+ msg.style.display='flex'; document.getElementById('homeHigh').textContent=high; say('अरे यार! फिर पकड़ा गया!');
+}
+function startGame(){
+ items.forEach(x=>x.el.remove());items=[];lane=1;setLane(1);score=0;coins=0;speed=4;spawn=0;
+ scoreEl.textContent=0;coinsEl.textContent=0;msg.style.display='none';running=true;last=performance.now();say('अरे भाई, गाय पीछे पड़ गई! 😂');requestAnimationFrame(loop);
+}
+function loop(t){
+ if(!running)return;
+ const dt=Math.min(32,t-last);last=t;
+ score += dt/50; speed=4+score/180;
+ scoreEl.textContent=Math.floor(score);
+ spawn+=dt;
+ if(spawn>Math.max(320,800-speed*45)){spawn=0;spawnItem()}
+ for(let i=items.length-1;i>=0;i--){
+   const x=items[i]; x.y+=speed*dt/8; x.el.style.top=x.y+'px';
+   if(x.y>innerHeight+80){x.el.remove();items.splice(i,1);continue}
+   if(x.l===lane && overlap(player,x.el)){
+     if(x.type==='coin'){coins++;coinsEl.textContent=coins;say('Coin! 🪙');x.el.remove();items.splice(i,1)}
+     else if(x.type==='power'){say('Shield! 🛡️');x.el.remove();items.splice(i,1)}
+     else if(!jumping){gameOver();return}
+   }
+ }
+ requestAnimationFrame(loop);
+}
+document.getElementById('start').onclick=startGame;
+document.getElementById('how').onclick=()=>{const x=document.getElementById('howText');x.style.display=x.style.display==='none'?'block':'none'};
+let sx=0,sy=0;
+game.addEventListener('touchstart',e=>{const p=e.changedTouches[0];sx=p.clientX;sy=p.clientY},{passive:true});
+game.addEventListener('touchend',e=>{const p=e.changedTouches[0],dx=p.clientX-sx,dy=p.clientY-sy;if(Math.max(Math.abs(dx),Math.abs(dy))<25)return;if(Math.abs(dx)>Math.abs(dy))setLane(lane+(dx>0?1:-1));else if(dy<0)jump()},{passive:true});
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft')setLane(lane-1);if(e.key==='ArrowRight')setLane(lane+1);if(e.key==='ArrowUp'||e.key===' ')jump();if(e.key==='Enter'&&!running)startGame()});
+setLane(1);
+</script>
+</body>
+</html>
